@@ -1,5 +1,7 @@
-use postgres::{Client, NoTls, Error, Row};
-use postgres::types::{Type, FromSql};
+use postgres::{Client, Error, Row};
+use postgres::types::Type;
+use postgres_openssl::MakeTlsConnector;
+use openssl::ssl::{SslConnector, SslMethod};
 use std::io::{self, Write};
 use std::env;
 
@@ -11,7 +13,13 @@ fn main() -> Result<(), Error> {
     }
     
     let db_url = &args[1];
-    let mut client = Client::connect(db_url, NoTls)?;
+
+    // Set up SSL connector
+    let mut builder = SslConnector::builder(SslMethod::tls()).unwrap();
+    builder.set_verify(openssl::ssl::SslVerifyMode::NONE);
+    let connector = MakeTlsConnector::new(builder.build());
+
+    let mut client = Client::connect(db_url, connector)?;
 
     loop {
         print_menu();
@@ -112,6 +120,7 @@ fn print_row(row: &Row) {
     }
     println!("{}", values.join(", "));
 }
+
 
 fn edit_table_data(client: &mut Client) -> Result<(), Error> {
     let table_name = get_user_input("Enter table name: ");
